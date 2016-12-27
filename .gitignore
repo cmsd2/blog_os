@@ -12,3 +12,7 @@
 
 # Build directory
 /build/
+
+# temp files
+.*.swp
+*~

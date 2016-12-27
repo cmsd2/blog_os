@@ -23,42 +23,82 @@ extern crate x86;
 mod vga_buffer;
 mod memory;
 
+use vga_buffer::*;
+use core::fmt::Write;
+use memory::*;
+
 #[no_mangle]
-pub extern "C" fn rust_main(multiboot_information_address: usize) {
-    // ATTENTION: we have a very small stack and no guard page
+pub extern fn rust_main(multiboot_magic: usize, multiboot_info: usize) {
     vga_buffer::clear_screen();
-    println!("Hello World{}", "!");
 
-    let boot_info = unsafe { multiboot2::load(multiboot_information_address) };
+    let x = ["Hello", " ", "World", "!"];
+    let test = (0..3).flat_map(|x| 0..x).zip(0..);
+    let mut a = ("hello", 42);
+    a.1 += 1;
+
+    let hello = b"Hello World!";
+    let color_byte = 0x1f; // white foreground, blue background
+
+    let mut hello_colored = [color_byte; 24];
+    for (i, char_byte) in hello.into_iter().enumerate() {
+        hello_colored[i*2] = *char_byte;
+    }
+
+
+    // write `Hello World!` to the center of the VGA text buffer
+    let buffer_ptr = (0xb8000 + 1988) as *mut _;
+    unsafe { *buffer_ptr = hello_colored };
+
+    println!("The numbers are {} and {}", 42, 1.0/3.0);
+
+    println!("Multiboot magic number was {:x}", multiboot_magic);
+    if multiboot_magic == 0x2badb002 {
+        panic!("Multiboot1 not currently supported");
+    }
+
+    let boot_info = unsafe{ multiboot2::load(multiboot_info) };
     let memory_map_tag = boot_info.memory_map_tag().expect("Memory map tag required");
-    let elf_sections_tag = boot_info.elf_sections_tag().expect("Elf sections tag required");
 
-    let kernel_start = elf_sections_tag.sections().map(|s| s.addr).min().unwrap();
-    let kernel_end = elf_sections_tag.sections().map(|s| s.addr + s.size).max().unwrap();
+    println!("memory areas:");
+    for area in memory_map_tag.memory_areas() {
+        println!("    start: 0x{:x}, length: 0x{:x}", area.base_addr, area.length);
+    }
 
-    let multiboot_start = multiboot_information_address;
+    let elf_sections_tag = boot_info.elf_sections_tag()
+        .expect("Elf-sections tag required");
+
+    println!("kernel sections:");
+    for section in elf_sections_tag.sections() {
+        println!("    addr: 0x{:x}, size: 0x{:x}, flags: 0x{:x}",
+            section.addr, section.size, section.flags);
+    }
+
+    let kernel_start = elf_sections_tag.sections().map(|s| s.addr)
+        .min().unwrap();
+    let kernel_end = elf_sections_tag.sections().map(|s| s.addr + s.size)
+        .max().unwrap();
+
+    println!("kernel_start: {:x}, kernel_end: {:x}", kernel_start, kernel_end);
+
+    let multiboot_start = multiboot_info;
     let multiboot_end = multiboot_start + (boot_info.total_size as usize);
 
-    println!("kernel start: 0x{:x}, kernel end: 0x{:x}",
-             kernel_start,
-             kernel_end);
-    println!("multiboot start: 0x{:x}, multiboot end: 0x{:x}",
-             multiboot_start,
-             multiboot_end);
+    println!("multiboot_start: {:x}, multiboot_end: {:x}", multiboot_start, multiboot_end);
 
-    let mut frame_allocator = memory::AreaFrameAllocator::new(kernel_start as usize,
-                                                              kernel_end as usize,
-                                                              multiboot_start,
-                                                              multiboot_end,
-                                                              memory_map_tag.memory_areas());
+    let mut frame_allocator = memory::AreaFrameAllocator::new(
+        kernel_start as usize, kernel_end as usize, multiboot_start,
+        multiboot_end, memory_map_tag.memory_areas());
+
+    println!("{:?}", frame_allocator.allocate_frame());
 
     enable_nxe_bit();
     enable_write_protect_bit();
 
     memory::remap_the_kernel(&mut frame_allocator, boot_info);
-    println!("It did not crash!");
 
-    loop {}
+    println!("still dancing");
+
+    loop{}
 }
 
 fn enable_nxe_bit() {
