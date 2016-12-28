@@ -6,7 +6,6 @@
 // <LICENSE-MIT or http://opensource.org/licenses/MIT>, at your
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
-
 #![feature(lang_items)]
 #![feature(const_fn, unique)]
 #![feature(alloc, collections)]
@@ -37,30 +36,43 @@ extern crate collections;
 #[macro_use]
 mod vga_buffer;
 mod memory;
-
 mod interrupts;
 
 #[no_mangle]
-pub extern "C" fn rust_main(multiboot_information_address: usize) {
-    // ATTENTION: we have a very small stack and no guard page
+pub extern fn rust_main(multiboot_magic: usize, multiboot_info: usize) {
     vga_buffer::clear_screen();
+
     println!("Hello World{}", "!");
 
-    let boot_info = unsafe { multiboot2::load(multiboot_information_address) };
+    println!("Multiboot magic number was {:x}", multiboot_magic);
+    if multiboot_magic == 0x2badb002 {
+        panic!("Multiboot1 not currently supported");
+    }
+
+    let boot_info = unsafe{ multiboot2::load(multiboot_info) };
+
     enable_nxe_bit();
     enable_write_protect_bit();
 
-    // set up guard page and map the heap pages
     memory::init(boot_info);
 
-    // initialize our IDT
     interrupts::init();
 
-    // trigger a breakpoint exception
     unsafe { int!(3) };
 
-    println!("It did not crash!");
-    loop {}
+    /*unsafe {
+        *(0xdeadbeaf as *mut u64) = 42
+    };*/
+    
+    println!("still dancing");
+
+    loop{}
+}
+
+fn divide_by_zero() {
+    unsafe {
+        asm!("mov dx, 0; div dx" ::: "ax", "dx" : "volatile", "intel")
+    }
 }
 
 fn enable_nxe_bit() {
@@ -86,6 +98,7 @@ extern "C" fn eh_personality() {}
 #[cfg(not(test))]
 #[lang = "panic_fmt"]
 #[no_mangle]
+#[allow(private_no_mangle_fns)]
 extern "C" fn panic_fmt(fmt: core::fmt::Arguments, file: &'static str, line: u32) -> ! {
     println!("\n\nPANIC in {} at line {}:", file, line);
     println!("    {}", fmt);

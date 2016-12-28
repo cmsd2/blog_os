@@ -1,64 +1,50 @@
-/*
-Copyright 2016 Philipp Oppermann. See the README.md
-file at the top-level directory of this distribution.
+KERNEL_LMA = 0x100000;
+KERNEL_VMA = 0xC0000000;
 
-Licensed under the Apache License, Version 2.0 <LICENSE-APACHE or
-http://www.apache.org/licenses/LICENSE-2.0> or the MIT license
-<LICENSE-MIT or http://opensource.org/licenses/MIT>, at your
-option. This file may not be copied, modified, or distributed
-except according to those terms.
-*/
-
-ENTRY(start)
+ENTRY(_start)
 
 SECTIONS {
-  . = 1M;
+    . = KERNEL_LMA;
 
-  .rodata :
-  {
-    /* ensure that the multiboot header is at the beginning */
-    KEEP(*(.multiboot_header))
-    *(.rodata .rodata.*)
-    . = ALIGN(4K);
-  }
+    .rodata : ALIGN(4K)
+    {
+        _rodata = .;
+        KEEP(*(.multiboot2_header))
+        KEEP(*(.multiboot_header))
+        *(.rodata .rodata.*)
+    }
 
-  .text :
-  {
-    *(.text .text.*)
-    . = ALIGN(4K);
-  }
+    .text : ALIGN(4K)
+    {
+        _code = .;
+        *(.text .text.*)
+    }
 
-  .data :
-  {
-    *(.data .data.*)
-    . = ALIGN(4K);
-  }
+    .data : ALIGN(4K)
+    {
+        _data = .;
+        *(.data .data.*)
+    }
 
-  .bss :
-  {
-    *(.bss .bss.*)
-    . = ALIGN(4K);
-  }
+    .bss : ALIGN(4K)
+    {
+        _bss = .;
+        *(COMMON)
+        *(.bss .bss.*)
+    }
 
-  .got :
-  {
-    *(.got)
-    . = ALIGN(4K);
-  }
+    .gcc_except_table : ALIGN(4K) 
+    {
+        *(.gcc_except_table)
+    }
 
-  .got.plt :
-  {
-    *(.got.plt)
-    . = ALIGN(4K);
-  }
+    .got : ALIGN(4K)
+    {
+        *(.got*)
+    }
 
-  .data.rel.ro : ALIGN(4K) {
-    *(.data.rel.ro.local*) *(.data.rel.ro .data.rel.ro.*)
-    . = ALIGN(4K);
-  }
-
-  .gcc_except_table : ALIGN(4K) {
-    *(.gcc_except_table)
-    . = ALIGN(4K);
-  }
+    .debug : ALIGN(4K)
+    {
+        *(.debug*)
+    }
 }
