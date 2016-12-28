@@ -34,7 +34,7 @@ check_long_mode:
     cpuid                   // CPU identification.
     cmp $0x80000001, %eax   // Compare the A-register with 0x80000001.
     jb .no_long_mode        // It is less, there is no long mode.
-    mov 0x80000001, %eax    // Set the A-register to 0x80000001.
+    mov $0x80000001, %eax    // Set the A-register to 0x80000001.
     cpuid                   // CPU identification.
     test $0x20000000, %edx  // Test if the LM-bit is set in the D-register.
     jz .no_long_mode        // They aren't, there is no long mode.
