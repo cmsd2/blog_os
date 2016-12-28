@@ -5,13 +5,16 @@ iso := build/os-$(arch).iso
 target ?= $(arch)-unknown-linux-gnu
 rust_os := target/$(target)/debug/libblog_os.a
 
+AS := ${triple}as
 CC := ${triple}gcc
 LD := ${triple}ld
 NASM := nasm
-CFLAGS += -Wall -D_KERNEL
-GCCFLAGS += -nostdlib -ffreestanding -g -O0
-LDFLAGS += -Wl,-n -Wl,--gc-sections -g -O0
-LIBS += -lgcc
+ASFLAGS += -g
+CFLAGS += -Wall -D_KERNEL -g -O0
+GCCFLAGS += -nostdlib -ffreestanding
+GCCLDFLAGS += -Wl,-n -Wl,--gc-sections -g -O0
+LDFLAGS += -n --gc-sections 
+#LIBS += -lgcc
 NASMFLAGS += -felf64
 
 linker_script := src/arch/$(arch)/linker.ld
@@ -41,7 +44,7 @@ all: $(kernel)
 
 
 cargo:
-	cargo rustc --target $(target) -- -Z no-landing-pads -C no-redzone
+	cargo rustc --target $(target) -- -C no-redzone
 
 print-%:
 	@echo '$*=$($*)'
@@ -71,12 +74,12 @@ $(iso): $(kernel) $(grub_cfg)
 	#rm -r build/isofiles
 
 $(kernel): cargo $(rust_os) $(object_files) $(linker_script)
-	$(CC) $(GCCFLAGS) $(LDFLAGS) -T$(linker_script) -o $(kernel) $(object_files) $(rust_os) $(LIBS)
+	$(LD) $(LDFLAGS) -T$(linker_script) -o $(kernel) $(object_files) $(rust_os) $(LIBS)
 
 # compile assembly files
 build/arch/$(arch)/%.o: src/arch/$(arch)/%.S
 	@mkdir -p $(shell dirname $@)
-	$(CC) $(GCCFLAGS) $(CFLAGS) -c $< -o $@
+	$(AS) $(ASFLAGS) -c $< -o $@
 
 build/arch/$(arch)/%.o: src/arch/$(arch)/%.asm
 	@mkdir -p $(shell dirname $@)
@@ -84,5 +87,5 @@ build/arch/$(arch)/%.o: src/arch/$(arch)/%.asm
 
 build/arch/$(arch)/%.o: src/arch/$(arch)/%.c
 	@mkdir -p $(shell dirname $@)
-	$(CC) $(GCCFLAGS) $(CFLAGS) -c $< -o $@
+	$(AS) $(ASFLAGS) -c $< -o $@
 
