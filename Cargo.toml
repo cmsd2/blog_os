@@ -1,22 +1,25 @@
 [package]
+authors = ["Philipp Oppermann <dev@phil-opp.com>"]
 name = "blog_os"
 version = "0.1.0"
-authors = ["Philipp Oppermann <dev@phil-opp.com>"]
-
-[lib]
-crate-type = ["staticlib"]
 
 [dependencies]
+bitflags = "0.4.0"
+once = "0.3.2"
 rlibc = "0.1.4"
 spin = "0.3.4"
 x86 = "0.6.0"
 
+[dependencies.bump_allocator]
+path = "libs/bump_allocator"
+
 [dependencies.multiboot2]
 git = "https://github.com/phil-opp/multiboot2-elf64"
 
-[dependencies.bitflags]
-git = "https://github.com/phil-opp/bitflags.git"
-branch = "no_std"
+[lib]
+crate-type = ["staticlib"]
+
+[profile]
 
 [profile.dev]
 panic = "abort"

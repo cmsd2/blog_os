@@ -53,7 +53,7 @@ clean:
 	@rm -r build
 
 run: $(iso)
-	qemu-system-x86_64 -cpu qemu64 -no-reboot -no-shutdown -d cpu_reset,guest_errors,int -cdrom $(iso)
+	qemu-system-x86_64 -display curses -cpu qemu64 -no-reboot -no-shutdown -d cpu_reset,guest_errors,int -cdrom $(iso)
 
 debug: $(iso)
 	qemu-system-x86_64 -s -S -cpu core2duo -no-reboot -no-shutdown -d cpu_reset,guest_errors -cdrom $(iso)
