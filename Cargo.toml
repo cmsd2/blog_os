@@ -9,7 +9,7 @@ crate-type = ["staticlib"]
 [dependencies]
 rlibc = "0.1.4"
 spin = "0.3.4"
-x86 = "0.5.0"
+x86 = "0.6.0"
 
 [dependencies.multiboot2]
 git = "https://github.com/phil-opp/multiboot2-elf64"
@@ -17,3 +17,9 @@ git = "https://github.com/phil-opp/multiboot2-elf64"
 [dependencies.bitflags]
 git = "https://github.com/phil-opp/bitflags.git"
 branch = "no_std"
+
+[profile.dev]
+panic = "abort"
+
+[profile.release]
+panic = "abort"
