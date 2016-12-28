@@ -32,6 +32,7 @@ extern crate once;
 extern crate bit_field;
 #[macro_use]
 extern crate lazy_static;
+extern crate volatile;
 
 #[macro_use]
 mod vga_buffer;
