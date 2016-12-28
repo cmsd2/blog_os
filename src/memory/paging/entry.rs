@@ -1,4 +1,4 @@
-// Copyright 2015 Philipp Oppermann. See the README.md
+// Copyright 2016 Philipp Oppermann. See the README.md
 // file at the top-level directory of this distribution.
 //
 // Licensed under the Apache License, Version 2.0 <LICENSE-APACHE or
@@ -40,7 +40,7 @@ impl Entry {
 }
 
 bitflags! {
-    flags EntryFlags: u64 {
+    pub flags EntryFlags: u64 {
         const PRESENT =         1 << 0,
         const WRITABLE =        1 << 1,
         const USER_ACCESSIBLE = 1 << 2,

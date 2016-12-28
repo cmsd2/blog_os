@@ -1,4 +1,4 @@
-// Copyright 2015 Philipp Oppermann. See the README.md
+// Copyright 2016 Philipp Oppermann. See the README.md
 // file at the top-level directory of this distribution.
 //
 // Licensed under the Apache License, Version 2.0 <LICENSE-APACHE or
@@ -69,9 +69,9 @@ impl Mapper {
         };
 
         p3.and_then(|p3| p3.next_table(page.p3_index()))
-          .and_then(|p2| p2.next_table(page.p2_index()))
-          .and_then(|p1| p1[page.p1_index()].pointed_frame())
-          .or_else(huge_page)
+            .and_then(|p2| p2.next_table(page.p2_index()))
+            .and_then(|p1| p1[page.p1_index()].pointed_frame())
+            .or_else(huge_page)
     }
 
     pub fn map_to<A>(&mut self, page: Page, frame: Frame, flags: EntryFlags, allocator: &mut A)
@@ -105,14 +105,14 @@ impl Mapper {
         assert!(self.translate(page.start_address()).is_some());
 
         let p1 = self.p4_mut()
-                     .next_table_mut(page.p4_index())
-                     .and_then(|p3| p3.next_table_mut(page.p3_index()))
-                     .and_then(|p2| p2.next_table_mut(page.p2_index()))
-                     .expect("mapping code does not support huge pages");
+            .next_table_mut(page.p4_index())
+            .and_then(|p3| p3.next_table_mut(page.p3_index()))
+            .and_then(|p2| p2.next_table_mut(page.p2_index()))
+            .expect("mapping code does not support huge pages");
         let frame = p1[page.p1_index()].pointed_frame().unwrap();
         p1[page.p1_index()].set_unused();
         unsafe { ::x86::shared::tlb::flush(page.start_address()) };
         // TODO free p(1,2,3) table if empty
-        //allocator.deallocate_frame(frame);
+        // allocator.deallocate_frame(frame);
     }
 }

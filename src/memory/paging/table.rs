@@ -1,4 +1,4 @@
-// Copyright 2015 Philipp Oppermann. See the README.md
+// Copyright 2016 Philipp Oppermann. See the README.md
 // file at the top-level directory of this distribution.
 //
 // Licensed under the Apache License, Version 2.0 <LICENSE-APACHE or
@@ -20,7 +20,8 @@ pub struct Table<L: TableLevel> {
     level: PhantomData<L>,
 }
 
-impl<L> Table<L> where L: TableLevel
+impl<L> Table<L>
+    where L: TableLevel
 {
     pub fn zero(&mut self) {
         for entry in self.entries.iter_mut() {
@@ -29,7 +30,8 @@ impl<L> Table<L> where L: TableLevel
     }
 }
 
-impl<L> Table<L> where L: HierarchicalLevel
+impl<L> Table<L>
+    where L: HierarchicalLevel
 {
     fn next_table_address(&self, index: usize) -> Option<usize> {
         let entry_flags = self[index].flags();
@@ -68,7 +70,8 @@ impl<L> Table<L> where L: HierarchicalLevel
     }
 }
 
-impl<L> Index<usize> for Table<L> where L: TableLevel
+impl<L> Index<usize> for Table<L>
+    where L: TableLevel
 {
     type Output = Entry;
 
@@ -77,7 +80,8 @@ impl<L> Index<usize> for Table<L> where L: TableLevel
     }
 }
 
-impl<L> IndexMut<usize> for Table<L> where L: TableLevel
+impl<L> IndexMut<usize> for Table<L>
+    where L: TableLevel
 {
     fn index_mut(&mut self, index: usize) -> &mut Entry {
         &mut self.entries[index]
@@ -87,8 +91,10 @@ impl<L> IndexMut<usize> for Table<L> where L: TableLevel
 pub trait TableLevel {}
 
 pub enum Level4 {}
-enum Level3 {}
-enum Level2 {}
+#[allow(dead_code)]
+pub enum Level3 {}
+#[allow(dead_code)]
+pub enum Level2 {}
 pub enum Level1 {}
 
 impl TableLevel for Level4 {}
@@ -96,7 +102,7 @@ impl TableLevel for Level3 {}
 impl TableLevel for Level2 {}
 impl TableLevel for Level1 {}
 
-trait HierarchicalLevel: TableLevel {
+pub trait HierarchicalLevel: TableLevel {
     type NextLevel: TableLevel;
 }
 

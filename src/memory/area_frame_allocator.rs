@@ -1,4 +1,4 @@
-// Copyright 2015 Philipp Oppermann. See the README.md
+// Copyright 2016 Philipp Oppermann. See the README.md
 // file at the top-level directory of this distribution.
 //
 // Licensed under the Apache License, Version 2.0 <LICENSE-APACHE or
@@ -47,13 +47,12 @@ impl AreaFrameAllocator {
 
     fn choose_next_area(&mut self) {
         self.current_area = self.areas
-                                .clone()
-                                .filter(|area| {
-                                    let address = area.base_addr + area.length - 1;
-                                    Frame::containing_address(address as usize) >=
-                                    self.next_free_frame
-                                })
-                                .min_by_key(|area| area.base_addr);
+            .clone()
+            .filter(|area| {
+                let address = area.base_addr + area.length - 1;
+                Frame::containing_address(address as usize) >= self.next_free_frame
+            })
+            .min_by_key(|area| area.base_addr);
 
         if let Some(area) = self.current_area {
             let start_frame = Frame::containing_address(area.base_addr as usize);

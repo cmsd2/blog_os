@@ -1,61 +1,13 @@
-use x86::shared::control_regs;
+// Copyright 2016 Philipp Oppermann. See the README.md
+// file at the top-level directory of this distribution.
+//
+// Licensed under the Apache License, Version 2.0 <LICENSE-APACHE or
+// http://www.apache.org/licenses/LICENSE-2.0> or the MIT license
+// <LICENSE-MIT or http://opensource.org/licenses/MIT>, at your
+// option. This file may not be copied, modified, or distributed
+// except according to those terms.
 
 mod idt;
-
-macro_rules! handler {
-    ($name: ident) => {{
-        #[naked]
-        extern "C" fn wrapper() -> ! {
-            unsafe {
-                save_scratch_registers!();
-
-                asm!("mov rdi, rsp
-                      add rdi, 9*8 // adjust exception frame ptr after saving registers
-                      call $0"
-                      :: "i"($name as extern "C" fn(
-                          &ExceptionStackFrame)) 
-                      : "rdi" : "intel", "volatile");
-
-                restore_scratch_registers!();
-
-                asm!("iretq"
-                      :::: "intel", "volatile");
-
-                ::core::intrinsics::unreachable();
-            }
-        }
-        wrapper
-    }}
-}
-
-macro_rules! handler_with_error_code {
-    ($name: ident) => {{
-        #[naked]
-        extern "C" fn wrapper() -> ! {
-            unsafe {
-                save_scratch_registers!();
-
-                asm!("mov rsi, [rsp + 9*8] // load error code into rsi
-                      mov rdi, rsp
-                      add rdi, 10*8 // calculate exception stack frame ptr
-                      sub rsp, 8 // align the stack pointer
-                      call $0
-                      add rsp, 8"
-                      :: "i"($name as extern "C" fn(
-                          &ExceptionStackFrame, u64)) 
-                      : "rdi","rsi" : "intel");
-
-                restore_scratch_registers!();
-
-                asm!("add rsp, 8 // pop error code
-                      iretq" :::: "intel", "volatile");
-
-                ::core::intrinsics::unreachable();
-            }
-        }
-        wrapper
-    }}
-}
 
 macro_rules! save_scratch_registers {
     () => {
@@ -68,7 +20,7 @@ macro_rules! save_scratch_registers {
               push r9
               push r10
               push r11
-              " :::: "intel" "volatile");
+        " :::: "intel", "volatile");
     }
 }
 
@@ -83,8 +35,55 @@ macro_rules! restore_scratch_registers {
               pop rdx
               pop rcx
               pop rax
-              " :::: "intel" "volatile");
+            " :::: "intel", "volatile");
     }
+}
+
+macro_rules! handler {
+    ($name: ident) => {{
+        #[naked]
+        extern "C" fn wrapper() -> ! {
+            unsafe {
+                save_scratch_registers!();
+                asm!("mov rdi, rsp
+                      add rdi, 9*8 // calculate exception stack frame pointer
+                      call $0"
+                      :: "i"($name as extern "C" fn(
+                          &ExceptionStackFrame))
+                      : "rdi" : "intel");
+
+                restore_scratch_registers!();
+                asm!("iretq" :::: "intel", "volatile");
+                ::core::intrinsics::unreachable();
+            }
+        }
+        wrapper
+    }}
+}
+
+macro_rules! handler_with_error_code {
+    ($name: ident) => {{
+        #[naked]
+        extern "C" fn wrapper() -> ! {
+            unsafe {
+                save_scratch_registers!();
+                asm!("mov rsi, [rsp + 9*8] // load error code into rsi
+                      mov rdi, rsp
+                      add rdi, 10*8 // calculate exception stack frame pointer
+                      sub rsp, 8 // align the stack pointer
+                      call $0
+                      add rsp, 8 // undo stack pointer alignment
+                      " :: "i"($name as extern "C" fn(
+                          &ExceptionStackFrame, u64))
+                      : "rdi","rsi" : "intel");
+                restore_scratch_registers!();
+                asm!("add rsp, 8 // pop error code
+                      iretq" :::: "intel", "volatile");
+                ::core::intrinsics::unreachable();
+            }
+        }
+        wrapper
+    }}
 }
 
 lazy_static! {
@@ -104,37 +103,6 @@ pub fn init() {
     IDT.load();
 }
 
-extern "C" fn divide_by_zero_handler(stack_frame: &ExceptionStackFrame) {
-    println!("EXCEPTION: DIVIDE BY ZERO\n{:#?}", stack_frame);
-    loop {}
-}
-
-extern "C" fn breakpoint_handler(stack_frame: &ExceptionStackFrame) {
-    let stack_frame = unsafe { &*stack_frame };
-    println!("\nEXCEPTION: BREAKPOINT at {:#x}\n{:#?}",
-        stack_frame.instruction_pointer, stack_frame);
-}
-
-extern "C" fn invalid_opcode_handler(stack_frame: &ExceptionStackFrame) {
-    let stack_frame = unsafe { &*stack_frame };
-    println!("EXCEPTION: INVALID OPCODE at {:#x}\n{:#?}", 
-        stack_frame.instruction_pointer,
-        stack_frame);
-    loop {}
-}
-
-extern "C" fn page_fault_handler(stack_frame: &ExceptionStackFrame,
-                                 error_code: u64)
-{
-    println!("\nEXCEPTION: PAGE FAULT while accessing {:#x}\
-            \nerror code {:?}\
-            \n{:#?}",
-            unsafe { control_regs::cr2() },
-            PageFaultErrorCode::from_bits(error_code).unwrap(),
-            unsafe { &*stack_frame });
-    loop {}
-}
-
 #[derive(Debug)]
 #[repr(C)]
 struct ExceptionStackFrame {
@@ -145,13 +113,40 @@ struct ExceptionStackFrame {
     stack_segment: u64,
 }
 
+extern "C" fn divide_by_zero_handler(stack_frame: &ExceptionStackFrame) {
+    println!("\nEXCEPTION: DIVIDE BY ZERO\n{:#?}", stack_frame);
+    loop {}
+}
+
+extern "C" fn breakpoint_handler(stack_frame: &ExceptionStackFrame) {
+    println!("\nEXCEPTION: BREAKPOINT at {:#x}\n{:#?}",
+             stack_frame.instruction_pointer,
+             stack_frame);
+}
+
+extern "C" fn invalid_opcode_handler(stack_frame: &ExceptionStackFrame) {
+    println!("\nEXCEPTION: INVALID OPCODE at {:#x}\n{:#?}",
+             stack_frame.instruction_pointer,
+             stack_frame);
+    loop {}
+}
+
 bitflags! {
     flags PageFaultErrorCode: u64 {
-        const PROTECTION_VIOLATIOn = 1 << 0,
+        const PROTECTION_VIOLATION = 1 << 0,
         const CAUSED_BY_WRITE = 1 << 1,
         const USER_MODE = 1 << 2,
-        const MALFORMED_TABLE =1 << 3,
+        const MALFORMED_TABLE = 1 << 3,
         const INSTRUCTION_FETCH = 1 << 4,
     }
 }
 
+extern "C" fn page_fault_handler(stack_frame: &ExceptionStackFrame, error_code: u64) {
+    use x86::shared::control_regs;
+    println!("\nEXCEPTION: PAGE FAULT while accessing {:#x}\nerror code: \
+                                  {:?}\n{:#?}",
+             unsafe { control_regs::cr2() },
+             PageFaultErrorCode::from_bits(error_code).unwrap(),
+             stack_frame);
+    loop {}
+}

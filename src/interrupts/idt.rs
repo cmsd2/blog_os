@@ -1,9 +1,14 @@
+// Copyright 2016 Philipp Oppermann. See the README.md
+// file at the top-level directory of this distribution.
+//
+// Licensed under the Apache License, Version 2.0 <LICENSE-APACHE or
+// http://www.apache.org/licenses/LICENSE-2.0> or the MIT license
+// <LICENSE-MIT or http://opensource.org/licenses/MIT>, at your
+// option. This file may not be copied, modified, or distributed
+// except according to those terms.
 
 use x86::shared::segmentation::{self, SegmentSelector};
 use x86::shared::PrivilegeLevel;
-use bit_field::BitField;
-
-pub type HandlerFunc = extern "C" fn() -> !;
 
 pub struct Idt([Entry; 16]);
 
@@ -12,9 +17,7 @@ impl Idt {
         Idt([Entry::missing(); 16])
     }
 
-    pub fn set_handler(&mut self, entry: u8, handler: HandlerFunc)
-        -> &mut EntryOptions
-    {
+    pub fn set_handler(&mut self, entry: u8, handler: HandlerFunc) -> &mut EntryOptions {
         self.0[entry as usize] = Entry::new(segmentation::cs(), handler);
         &mut self.0[entry as usize].options
     }
@@ -32,7 +35,7 @@ impl Idt {
     }
 }
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Clone, Copy)]
 #[repr(C, packed)]
 pub struct Entry {
     pointer_low: u16,
@@ -43,9 +46,11 @@ pub struct Entry {
     reserved: u32,
 }
 
+pub type HandlerFunc = extern "C" fn() -> !;
+
 impl Entry {
     fn new(gdt_selector: SegmentSelector, handler: HandlerFunc) -> Self {
-        let pointer: u64 = handler as u64;
+        let pointer = handler as u64;
         Entry {
             gdt_selector: gdt_selector,
             pointer_low: pointer as u16,
@@ -68,20 +73,21 @@ impl Entry {
     }
 }
 
-#[derive(Debug, Copy, Clone)]
+use bit_field::BitField;
+
+#[derive(Debug, Clone, Copy)]
 pub struct EntryOptions(u16);
 
 impl EntryOptions {
     fn minimal() -> Self {
         let mut options = 0;
-        options.set_range(9..12, 0b111);
+        options.set_range(9..12, 0b111); // 'must-be-one' bits
         EntryOptions(options)
     }
 
     fn new() -> Self {
         let mut options = Self::minimal();
-        options.set_present(true)
-               .disable_interrupts(true);
+        options.set_present(true).disable_interrupts(true);
         options
     }
 
@@ -95,14 +101,15 @@ impl EntryOptions {
         self
     }
 
+    #[allow(dead_code)]
     pub fn set_privilege_level(&mut self, dpl: u16) -> &mut Self {
         self.0.set_range(13..15, dpl);
         self
     }
 
+    #[allow(dead_code)]
     pub fn set_stack_index(&mut self, index: u16) -> &mut Self {
         self.0.set_range(0..3, index);
         self
     }
 }
-

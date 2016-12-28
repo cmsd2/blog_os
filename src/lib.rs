@@ -60,9 +60,9 @@ pub extern fn rust_main(multiboot_magic: usize, multiboot_info: usize) {
 
     unsafe { int!(3) };
 
-    unsafe {
+    /*unsafe {
         *(0xdeadbeaf as *mut u64) = 42
-    };
+    };*/
     
     println!("still dancing");
 

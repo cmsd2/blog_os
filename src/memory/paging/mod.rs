@@ -1,4 +1,4 @@
-// Copyright 2015 Philipp Oppermann. See the README.md
+// Copyright 2016 Philipp Oppermann. See the README.md
 // file at the top-level directory of this distribution.
 //
 // Licensed under the Apache License, Version 2.0 <LICENSE-APACHE or
@@ -24,7 +24,7 @@ const ENTRY_COUNT: usize = 512;
 pub type PhysicalAddress = usize;
 pub type VirtualAddress = usize;
 
-#[derive(Debug, Clone, Copy, PartialOrd, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Page {
     number: usize,
 }
@@ -141,7 +141,7 @@ impl ActivePageTable {
             p4_frame: Frame::containing_address(unsafe { control_regs::cr3() } as usize),
         };
         unsafe {
-            control_regs::cr3_write(new_table.p4_frame.start_address() as usize);
+            control_regs::cr3_write(new_table.p4_frame.start_address());
         }
         old_table
     }
@@ -167,12 +167,9 @@ impl InactivePageTable {
     }
 }
 
-pub fn remap_the_kernel<A>(allocator: &mut A, boot_info: &BootInformation)
-    -> ActivePageTable
+pub fn remap_the_kernel<A>(allocator: &mut A, boot_info: &BootInformation) -> ActivePageTable
     where A: FrameAllocator
 {
-    use core::ops::Range;
-
     let mut temporary_page = TemporaryPage::new(Page { number: 0xcafebabe }, allocator);
 
     let mut active_table = unsafe { ActivePageTable::new() };
@@ -183,35 +180,40 @@ pub fn remap_the_kernel<A>(allocator: &mut A, boot_info: &BootInformation)
 
     active_table.with(&mut new_table, &mut temporary_page, |mapper| {
         let elf_sections_tag = boot_info.elf_sections_tag()
-                                        .expect("Memory map tag required");
+            .expect("Memory map tag required");
 
+        // identity map the allocated kernel sections
         for section in elf_sections_tag.sections() {
-            use multiboot2::ELF_SECTION_ALLOCATED;
-
-            if !section.flags().contains(ELF_SECTION_ALLOCATED) {
+            if !section.is_allocated() {
                 // section is not loaded to memory
                 continue;
             }
 
+            assert!(section.addr as usize % PAGE_SIZE == 0,
+                    "sections need to be page aligned");
             println!("mapping section at addr: {:#x}, size: {:#x}",
                      section.addr,
                      section.size);
 
             let flags = EntryFlags::from_elf_section_flags(section);
 
-            let range = Range {
-                start: section.addr as usize,
-                end: (section.addr + section.size) as usize,
-            };
-            for address in range.step_by(PAGE_SIZE) {
-                assert!(address % PAGE_SIZE == 0, "sections need to be page aligned");
-                let frame = Frame::containing_address(address);
+            let start_frame = Frame::containing_address(section.start_address());
+            let end_frame = Frame::containing_address(section.end_address() - 1);
+            for frame in Frame::range_inclusive(start_frame, end_frame) {
                 mapper.identity_map(frame, flags, allocator);
             }
         }
 
+        // identity map the VGA text buffer
         let vga_buffer_frame = Frame::containing_address(0xb8000);
         mapper.identity_map(vga_buffer_frame, WRITABLE, allocator);
+
+        // identity map the multiboot info structure
+        let multiboot_start = Frame::containing_address(boot_info.start_address());
+        let multiboot_end = Frame::containing_address(boot_info.end_address() - 1);
+        for frame in Frame::range_inclusive(multiboot_start, multiboot_end) {
+            mapper.identity_map(frame, PRESENT, allocator);
+        }
     });
 
     let old_table = active_table.switch(new_table);
