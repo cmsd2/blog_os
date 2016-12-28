@@ -2,7 +2,7 @@ arch := x86_64
 triple := ${arch}-pc-elf-
 kernel := build/kernel-$(arch).bin
 iso := build/os-$(arch).iso
-target ?= $(arch)-unknown-linux-gnu
+target ?= $(arch)-blog_os
 rust_os := target/$(target)/debug/libblog_os.a
 
 AS := ${triple}as
@@ -44,7 +44,7 @@ all: $(kernel)
 
 
 cargo:
-	cargo rustc --target $(target) -- -C no-redzone
+	xargo build --target $(target)
 
 print-%:
 	@echo '$*=$($*)'
@@ -53,7 +53,7 @@ clean:
 	@rm -r build
 
 run: $(iso)
-	qemu-system-x86_64 -display curses -cpu qemu64 -no-reboot -no-shutdown -d cpu_reset,guest_errors,int -cdrom $(iso)
+	qemu-system-x86_64 -display curses -cpu qemu64 -no-reboot -no-shutdown -d cpu_reset,guest_errors -cdrom $(iso)
 
 debug: $(iso)
 	qemu-system-x86_64 -s -S -cpu core2duo -no-reboot -no-shutdown -d cpu_reset,guest_errors -cdrom $(iso)

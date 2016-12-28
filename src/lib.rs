@@ -6,7 +6,9 @@
 // <LICENSE-MIT or http://opensource.org/licenses/MIT>, at your
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
-
+#![feature(asm)]
+#![feature(naked_functions)]
+#![feature(core_intrinsics)]
 #![feature(lang_items)]
 #![feature(const_fn, unique)]
 #![feature(step_by)]
@@ -19,6 +21,7 @@ extern crate spin;
 extern crate multiboot2;
 #[macro_use]
 extern crate bitflags;
+#[macro_use]
 extern crate x86;
 extern crate hole_list_allocator;
 extern crate alloc;
@@ -26,14 +29,14 @@ extern crate alloc;
 extern crate collections;
 #[macro_use]
 extern crate once;
+extern crate bit_field;
+#[macro_use]
+extern crate lazy_static;
 
 #[macro_use]
 mod vga_buffer;
 mod memory;
-
-use vga_buffer::*;
-use core::fmt::Write;
-use memory::*;
+mod interrupts;
 
 #[no_mangle]
 pub extern fn rust_main(multiboot_magic: usize, multiboot_info: usize) {
@@ -53,13 +56,27 @@ pub extern fn rust_main(multiboot_magic: usize, multiboot_info: usize) {
 
     memory::init(boot_info);
 
+    interrupts::init();
+
+    unsafe { int!(3) };
+
+    /*unsafe {
+        *(0xdeadbeaf as *mut u64) = 42
+    };*/
+    
     println!("still dancing");
 
     loop{}
 }
 
+fn divide_by_zero() {
+    unsafe {
+        asm!("mov dx, 0; div dx" ::: "ax", "dx" : "volatile", "intel")
+    }
+}
+
 fn enable_nxe_bit() {
-    use x86::msr::{IA32_EFER, rdmsr, wrmsr};
+    use x86::shared::msr::{IA32_EFER, rdmsr, wrmsr};
 
     let nxe_bit = 1 << 11;
     unsafe {
@@ -69,9 +86,9 @@ fn enable_nxe_bit() {
 }
 
 fn enable_write_protect_bit() {
-    use x86::controlregs::{cr0, cr0_write};
+    use x86::shared::control_regs::{self, cr0, cr0_write};
 
-    let wp_bit = 1 << 16;
+    let wp_bit = control_regs::CR0_WRITE_PROTECT;
     unsafe { cr0_write(cr0() | wp_bit) };
 }
 
