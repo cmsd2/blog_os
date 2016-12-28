@@ -33,13 +33,23 @@ macro_rules! handler_with_error_code {
         #[naked]
         extern "C" fn wrapper() -> ! {
             unsafe {
-                asm!("pop rsi
-                    mov rdi, rsp
-                    sub rsp, 8 // align the stack pointer
-                    call $0"
-                    :: "i"($name as extern "C" fn(
-                        &ExceptionStackFrame, u64) -> !) 
-                    : "rdi","rsi" : "intel");
+                save_scratch_registers!();
+
+                asm!("mov rsi, [rsp + 9*8] // load error code into rsi
+                      mov rdi, rsp
+                      add rdi, 10*8 // calculate exception stack frame ptr
+                      sub rsp, 8 // align the stack pointer
+                      call $0
+                      add rsp, 8"
+                      :: "i"($name as extern "C" fn(
+                          &ExceptionStackFrame, u64)) 
+                      : "rdi","rsi" : "intel");
+
+                restore_scratch_registers!();
+
+                asm!("add rsp, 8 // pop error code
+                      iretq" :::: "intel", "volatile");
+
                 ::core::intrinsics::unreachable();
             }
         }
@@ -114,7 +124,7 @@ extern "C" fn invalid_opcode_handler(stack_frame: &ExceptionStackFrame) {
 }
 
 extern "C" fn page_fault_handler(stack_frame: &ExceptionStackFrame,
-                                 error_code: u64) -> !
+                                 error_code: u64)
 {
     println!("\nEXCEPTION: PAGE FAULT while accessing {:#x}\
             \nerror code {:?}\
